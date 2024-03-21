@@ -3,4 +3,4 @@
     Then, all the files can import that, that way I can change it for all the files easily
 """
 
-DATA_FOLDER = "/home/vassilis/DNA/dataloc/"
+DATA_FOLDER = "/datavol/vassilis/DNA_perp"

@@ -12,9 +12,9 @@ from ... import SimpleTokenizer
 class MinGPT_Trainer(Trainer):
     def __init__(self, model: MinGPT, train_dataset: TokenTextBOS, valid_dataset : TokenTextBOS,
                  detokenizer :SimpleTokenizer=None, optim: Optimizer = None, scheduler: _LRScheduler = None, 
-                 state_save_loc=None, device: str = 'cpu', run_name: str = None, project_name: str = None,
+                 state_save_loc=None, device: str = 'cpu',parallel=None, run_name: str = None, project_name: str = None,
                  run_config: dict ={}):
-        super().__init__(model, optim, scheduler, state_save_loc=state_save_loc, device=device, run_name=run_name, project_name=project_name, run_config=run_config)
+        super().__init__(model, optim, scheduler, state_save_loc=state_save_loc,parallel=parallel, device=device, run_name=run_name, project_name=project_name, run_config=run_config)
 
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
@@ -66,16 +66,17 @@ class MinGPT_Trainer(Trainer):
         
 
     def valid_log(self):
-        mean_loss_tok = sum(self.mean_loss_val)/(len(self.mean_loss_val)) # (n_tok) normally
-        print('mean_loss_tok shape : ', mean_loss_tok.shape)
-        data = [[f'{i:03}', mean_loss_tok[i].item()] for i in range(mean_loss_tok.shape[0]) ]
-        table = wandb.Table(data=data, columns=["token", "loss"])
-        wandb.log(
-            {
-                f"token_loss:{self.batches : 04d}": wandb.plot.bar(
-                    table, "token", "loss", title=f"Batch : {self.batches : 04d}"
-                )
-            }
-        )
+        pass
+        # mean_loss_tok = sum(self.mean_loss_val)/(len(self.mean_loss_val)) # (n_tok) normally
+        # print('mean_loss_tok shape : ', mean_loss_tok.shape)
+        # data = [[f'{i:03}', mean_loss_tok[i].item()] for i in range(mean_loss_tok.shape[0]) ]
+        # table = wandb.Table(data=data, columns=["token", "loss"])
+        # wandb.log(
+        #     {
+        #         f"token_loss:{self.batches : 04d}": wandb.plot.bar(
+        #             table, "token", "loss", title=f"Batch : {self.batches : 04d}"
+        #         )
+        #     }
+        # )
 
-        self.mean_loss_val= []
+        # self.mean_loss_val= []
