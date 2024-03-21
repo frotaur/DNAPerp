@@ -4,3 +4,4 @@ tokendata
 local_dataset.h5
 merged.txt
 merged_R.txt
+__pycache__

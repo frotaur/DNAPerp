@@ -8,8 +8,8 @@ from torch.optim.lr_scheduler import LinearLR
 import numpy as np, shutil
 
 
-def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp', 
-          group=None, load=True,device='cpu'):
+def train_par(file_location,tokenizer_name,pickup,project_name = 'DNAPerp', 
+          group=None, load=True,devices=['cuda:0','cuda:1']):
     run_name = os.path.splitext(os.path.basename(file_location))[0]
 
     cur_path = pathlib.Path(__file__).parent.absolute().as_posix()
@@ -91,7 +91,6 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     model = MinGPT(**model_params)
 
     #====================== TRAINING PARAMETERS =======================
-    device = device
 
     batch_size = training_params['batch_size']
     aggregate = training_params['aggregate']
@@ -116,7 +115,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     trainer = MinGPT_Trainer(model=model,optim=optim,scheduler=scheduler,
                             train_dataset=train_dataset,valid_dataset=val_dataset, detokenizer=tokenizer,
                             run_name=run_name, project_name=project_name, state_save_loc=training_params['state_save_loc'],
-                            device=device, run_config={'group':group,'model_params':model_params,'train':training_params,'opti':optim_params} )
+                            device=devices[0], parallel=devices, run_config={'group':group,'model_params':model_params,'train':training_params,'opti':optim_params} )
 
     
     if(os.path.exists(os.path.join(training_params['state_save_loc'],project_name,'state',run_name+'.state')) and (load)):
@@ -137,13 +136,13 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description="Starts training of Predictor model given a JSON config file. \
                                      Use 'gen_run.py' to create a JSON config file.")
     parser.add_argument("file_location", help="Path to the JSON config file. Relative to where you launch the script from.")
-    parser.add_argument("-d", "--device", type=str, default='cpu', help="Device string, e.g. 'cuda:0' or 'cpu'")
+    parser.add_argument('-d','--devices', nargs='+', help='A list of devices')
     parser.add_argument("-t", "--tokenizer_name", help="Name of the tokenizer to use (<tok_name>.pt).")
     parser.add_argument("-p", "--nopickup", action='store_true', help="If set, will not try to pickup from last checkpoint.")
     args = parser.parse_args()
     pickup = not args.nopickup
-    device = args.device
+    devices = args.devices
     tokenizer_name = args.tokenizer_name
     file_location = args.file_location
 
-    train(file_location,tokenizer_name,pickup,device=device)
+    train_par(file_location,tokenizer_name,pickup,devices=devices)
