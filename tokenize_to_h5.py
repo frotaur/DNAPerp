@@ -16,7 +16,7 @@ if __name__=='__main__':
     premade_dict = {"$" : 0, "A" : 1, "C": 2, "G":3, "T":4} # Dictionary to use as tokenizer.
     
     destination_folder = os.path.join(DATA_FOLDER,'h5data') # Folder to save the .h5 file
-    temp_merged = os.path.join(DATA_FOLDER,'..','merged_R.txt')
+    temp_merged = os.path.join('merged_R.txt')
 
     # if(not os.path.exists(temp_merged)):
     #     merge_text(texts_folder, os.path.join(DATA_FOLDER,'..','merged_R.txt'))
