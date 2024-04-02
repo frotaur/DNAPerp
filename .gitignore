@@ -5,3 +5,5 @@ local_dataset.h5
 merged.txt
 merged_R.txt
 __pycache__
+h5chardna
+*.pyc

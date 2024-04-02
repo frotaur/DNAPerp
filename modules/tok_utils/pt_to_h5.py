@@ -26,30 +26,33 @@ def make_h5(pt_data_folder, tokenizer:SimpleTokenizer, data_name=None,destinatio
 
 
     if(os.path.isdir(pt_data_folder)):
-        extract_file = os.listdir(pt_data_folder)[0]
-        tensor = torch.load(os.path.join(pt_data_folder,extract_file))
-
-
+        # extract_file = os.listdir(pt_data_folder)[0]
+        # tensor = torch.load(os.path.join(pt_data_folder,extract_file))
         with h5py.File(tarname, 'w') as f:
             dset = f.create_dataset("tokens", shape=(0,),maxshape=(None,), chunks=(512,), dtype='uint8')  # note the maxshape parameter
             print('Created empty dataset')    
             current_index = 0
-            for file in tqdm(os.listdir(pt_data_folder)):
+            for file in os.listdir(pt_data_folder):
                 if os.path.splitext(file)[1]=='.pt':
                     pt_file = os.path.join(pt_data_folder,file)
                     tensor = torch.load(pt_file,map_location=torch.device('cpu')) # (length)
-                    phrase_length = tensor.shape[0]
-                    print(f'Detected phrase length of {phrase_length} tokens.')
+                    tot_length = tensor.shape[0]
+                    print(f'Tensor shape: {tensor.shape}')
 
                     print('snippet', tokenizer.detokenize(tensor[:30]))
-                    # Resize the dataset to accommodate the new data
-                    dset.resize((current_index + phrase_length,))
-                    
-                    # Add the new data to the dataset
-                    dset[current_index:current_index+phrase_length] = tensor.numpy()
-                    
-                    # Update the current ind
-                    current_index += phrase_length
+                    loadbar = tqdm(total=tot_length)
+                    while current_index < tot_length:
+                        phrase_length = min(1024*1024*1024, tot_length - current_index)
+                        # Resize the dataset to accommodate the new data
+                        dset.resize((current_index + phrase_length,))
+                        
+                        # Add the new data to the dataset
+                        dset[current_index:current_index+phrase_length] = tensor[current_index:current_index+phrase_length].numpy()
+                        
+                        # Update the current ind
+                        current_index += phrase_length
+                        loadbar.update(phrase_length)
+                    loadbar.close()
     else :
         raise ValueError(f'{pt_data_folder} not found')
 

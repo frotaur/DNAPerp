@@ -23,7 +23,7 @@ def tok_text_to_h5(text,premade_dict=None,destination_folder='h5data',tokenizer_
     if(premade_dict=={}):
         premade_dict=None
     
-    token_dict = tokenize(text,output_name=output_name,premade_dict=premade_dict)
+    token_dict = tokenize(text,output_name=output_name,premade_dict=premade_dict,fixed=True)
 
     os.makedirs(tokenizer_folder,exist_ok=True)
     if(tokenizer_name is None):

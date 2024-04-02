@@ -15,7 +15,7 @@ def tokenize(text_loc, output_name='last_tokenization', premade_dict=None, fixed
             fixed (bool, optional): If True, will raise an error if a character is not in the dictionary. Defaults to False.
             max_lines (int, optional): Number of lines to save in each pt file. Defaults to 1e7.
     """
-    x=10000 # Num of characters to handle at once
+    x=50000 # Num of characters to handle at once
     line_tensors = []
     tokendir = os.path.join('tokendata',output_name)
     shutil.rmtree(tokendir,ignore_errors=True)

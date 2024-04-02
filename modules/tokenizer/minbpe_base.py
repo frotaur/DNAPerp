@@ -1,7 +1,7 @@
 
 import unicodedata
 
-
+from tqdm import tqdm
 
 def get_stats(ids, counts=None):
     """
@@ -9,8 +9,9 @@ def get_stats(ids, counts=None):
     Example: [1, 2, 3, 1, 2] -> {(1, 2): 2, (2, 3): 1, (3, 1): 1}
     Optionally allows to update an existing dictionary of counts
     """
+    print('getting stats...')
     counts = {} if counts is None else counts
-    for pair in zip(ids, ids[1:]): # iterate consecutive elements
+    for pair in tqdm(zip(ids, ids[1:]),total=len(ids)): # iterate consecutive elements
         counts[pair] = counts.get(pair, 0) + 1
     return counts
 
@@ -21,6 +22,7 @@ def merge(ids, pair, idx):
     of pair with the new integer token idx
     Example: ids=[1, 2, 3, 1, 2], pair=(1, 2), idx=4 -> [4, 3, 4]
     """
+    print('merging...')
     newids = []
     i = 0
     while i < len(ids):

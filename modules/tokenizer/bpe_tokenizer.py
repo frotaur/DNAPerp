@@ -10,7 +10,7 @@ But:
 """
 
 from .minbpe_base import Tokenizer, get_stats, merge
-
+from tqdm import tqdm
 
 
 class BPETokenizer(Tokenizer):
@@ -25,11 +25,13 @@ class BPETokenizer(Tokenizer):
         # input text preprocessing
         text_bytes = text.encode("utf-8") # raw bytes
         ids = list(text_bytes) # list of integers in range 0..255
-
+        del text_bytes # save memory
+        
         # iteratively merge the most common pairs to create new tokens
         merges = {} # (int, int) -> int
         vocab = {idx: bytes([idx]) for idx in range(256)} # int -> bytes
-        for i in range(num_merges):
+        print('Computing merges...')
+        for i in tqdm(range(num_merges),total=num_merges):
             # count up the number of times every consecutive pair appears
             stats = get_stats(ids)
             # find the pair with the highest count
