@@ -60,3 +60,5 @@ def tokenize(text_loc, tokenizer : SimpleTokenizer, output_name='last_tokenizati
                     
     if(len(line_tensors)>0):
         torch.save(torch.cat(line_tensors,dim=0),os.path.join(tokendir,f'Data{int(numlines//max_lines+1)}.pt'))
+
+    return tokenizer.tok_dict

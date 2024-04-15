@@ -5,7 +5,7 @@ from ..tokenizer import SimpleTokenizer
 import shutil
 
 
-def tok_text_to_h5(text,premade_dict=None,destination_folder='h5data',tokenizer_folder='tokenizers', 
+def tok_text_to_h5(text,tokenizer:SimpleTokenizer,char_level=False,destination_folder='h5data',tokenizer_folder='tokenizers', 
                    tokenizer_name=None,output_name='last_tokenization',delete_txt=True):
     """
         Tokenizes text to .h5 file, training tokenizer on the go. Saves the tokenizer dictionary in tokenizer_folder. 
@@ -23,7 +23,7 @@ def tok_text_to_h5(text,premade_dict=None,destination_folder='h5data',tokenizer_
     if(premade_dict=={}):
         premade_dict=None
     
-    token_dict = tokenize(text,output_name=output_name,premade_dict=premade_dict,fixed=True)
+    token_dict = tokenize(text,tokenizer=tokenizer, char_level=char_level,output_name=output_name)
 
     os.makedirs(tokenizer_folder,exist_ok=True)
     if(tokenizer_name is None):
@@ -32,9 +32,10 @@ def tok_text_to_h5(text,premade_dict=None,destination_folder='h5data',tokenizer_
         tokenizername = tokenizer_name
     tok_loc = os.path.join(tokenizer_folder,tokenizername+'.pt')
     torch.save(token_dict,tok_loc) # Change tokenizer name here
+
+    make_h5(os.path.join('tokendata',output_name),tokenizer=tokenizer,destination_folder=destination_folder,data_name=output_name)
     
-    toki = SimpleTokenizer(tok_loc)
-    make_h5(os.path.join('tokendata',output_name),tokenizer=toki,destination_folder=destination_folder,data_name=output_name)
     if(delete_txt):
         os.remove(text)
+
     shutil.rmtree(os.path.join('tokendata',output_name))
