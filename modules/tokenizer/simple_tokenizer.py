@@ -6,12 +6,37 @@ curpath = Path(__file__).parent.absolute().as_posix()
 
 class SimpleTokenizer:
     """
+        Base class for simple tokenizers. Just a dictionary of vocab and that's it.
+    """
+
+    def __init__(self):
+        self.tok_dict = {}
+        self.tok_dict_rev = {}
+        self.vocab_size = 0
+
+        print('Initializing Tokenizer')
+    
+    def tokenize(self, text:str):
+        """
+            Tokenizes a string into a torch tensor
+        """
+        raise NotImplementedError('Tokenize not implemented')
+
+    def detokenize(self, tensor:torch.Tensor):
+        """
+            Detokenizes a torch tensor into a string
+        """
+        raise NotImplementedError('Detokenize not implemented')
+
+class CharTokenizer(SimpleTokenizer):
+    """
         Very simple character level tokenizer.
 
         Args:
             tok_dict_loc (str): Location of the tokenizer dictionary. Should be a torch.save'd dictionary.
     """
     def __init__(self, tok_dict_loc:str):
+        super().__init__()
         self.tok_dict = torch.load(tok_dict_loc)
         self.tok_dict_rev = {v:k for k,v in self.tok_dict.items()}
         self.vocab_size = len(self.tok_dict)	

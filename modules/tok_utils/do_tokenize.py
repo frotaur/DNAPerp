@@ -1,61 +1,62 @@
 import torch
 from tqdm import tqdm
 import os, shutil
+from ..tokenizer.simple_tokenizer import SimpleTokenizer
 
-
-def tokenize(text_loc, output_name='last_tokenization', premade_dict=None, fixed=False,max_lines= 1e6):
+def tokenize(text_loc, tokenizer : SimpleTokenizer, output_name='last_tokenization', 
+             char_level = False,max_lines= 1e6):
     """
-        Tokenizes text to .pt files, training tokenizer on the go. Returns tokenizer dictionary.
-        Saves results in tokendata folder, with name 'output_name'. WARNING it will overwrite previous tokenizations, it same name.
+        Tokenizes text to .pt files, using the given tokenizer.
+        Saves results in tokendata folder, with name 'output_name'.
+        WARNING : it will overwrite previous tokenizations, it same name.
 
         Args:
             text_loc (str): Location of text to tokenize
+            tokenizer (SimpleTokenizer): Tokenizer to use  
             output_name (str, optional): Name of the tokenization. Defaults to 'last_tokenization'.
             premade_dict (dict, optional): Dictionary to use as tokenizer. Defaults to None, in which case a new one is created.
             fixed (bool, optional): If True, will raise an error if a character is not in the dictionary. Defaults to False.
+            char_level (bool, optional): If True, will tokenize character by character. 
+                Otherwise, will tokenize by line. Defaults to False. Only useful if file
+                has no/almost no newlines, and is very large.
             max_lines (int, optional): Number of lines to save in each pt file. Defaults to 1e7.
     """
-    x=50000 # Num of characters to handle at once
+    if(char_level):
+        x=50000 # Num of characters to handle at once
+
     line_tensors = []
     tokendir = os.path.join('tokendata',output_name)
     shutil.rmtree(tokendir,ignore_errors=True)
     os.makedirs(tokendir,exist_ok=True)
-    if(premade_dict is not None):
-        if("$" not in premade_dict):
-            print('WARNING, BOS TOKEN NOT IN PREMADE DICT, ADDING IT AT THE END')
-            premade_dict["$"] = len(premade_dict)
-        token_dict = premade_dict
-    else:
-        token_dict ={"$":0}
 
     total_size = os.path.getsize(text_loc)
 
     with tqdm(total=total_size, unit='B', unit_scale=True) as pbar:
         with open(text_loc,'r') as file:
             numlines = 0
+            if(char_level):
+                while True:
+                    chunk = file.read(x)
+                    if not chunk:
+                        break
+                    
+                    pbar.update(len(chunk.encode('utf-8')))  # Update progress bar with bytes read
 
-            while True:
-                chunk = file.read(x)
-                if not chunk:
-                    break
-                
-                pbar.update(len(chunk.encode('utf-8')))  # Update progress bar with bytes read
-
-                numlines+=1
-                new_phrase = []
-                for charac in chunk.strip():
-                    if charac not in token_dict:
-                        if fixed:
-                            raise ValueError(f'Character {charac} not in dictionary, and fixed=True')
-                        token_dict[charac] = len(token_dict)
-                    new_phrase.append(token_dict[charac])
-                
-                line_tensors.append(torch.tensor(new_phrase,dtype=torch.uint8))
-                if(numlines%max_lines==0):
-                    torch.save(torch.cat(line_tensors,dim=0),os.path.join(tokendir,f'Data{int(numlines//max_lines)}.pt'))
-                    line_tensors = []
+                    numlines+=1
+                    new_phrase = tokenizer.tokenize(chunk) # (T,) tokenized tensor
+                    
+                    line_tensors.append(new_phrase)
+                    if(numlines%max_lines==0):
+                        torch.save(torch.cat(line_tensors,dim=0),os.path.join(tokendir,f'Data{int(numlines//max_lines)}.pt'))
+                        line_tensors = []
+            else :
+                for line in file:
+                    pbar.update(len(line.encode('utf-8')))	# Update progress bar with bytes read
+                    numlines+=1
+                    line_tensors.append(tokenizer.tokenize(line))
+                    if(numlines%max_lines==0):
+                        torch.save(torch.cat(line_tensors,dim=0),os.path.join(tokendir,f'Data{int(numlines//max_lines)}.pt'))
+                        line_tensors = []
                     
     if(len(line_tensors)>0):
         torch.save(torch.cat(line_tensors,dim=0),os.path.join(tokendir,f'Data{int(numlines//max_lines+1)}.pt'))
-
-    return token_dict

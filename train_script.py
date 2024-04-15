@@ -10,8 +10,8 @@ import numpy as np, shutil
 
 def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp', 
           group=None, load=True,device='cpu'):
+    
     run_name = os.path.splitext(os.path.basename(file_location))[0]
-
     cur_path = pathlib.Path(__file__).parent.absolute().as_posix()
 
     if(tokenizer_name is not None):
@@ -36,7 +36,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
 
 
     valid_steps =training_params['valid_steps'] # We ask how many validation steps. To get these, we assume 5% of training time allocated for validation.
-    valid_percent_time=20 # Time spent validating, in percentage
+    valid_percent_time=5 # Time spent validating, in percentage
     valid_percent_time=valid_percent_time/100
     # Note : for now we take the last few % for validation. Preferably, we should shuffle before splitting.
     # However, alot of subtelties with shuffling (partial phrases, consistency across runs, etc), so not implemented yet.
@@ -44,13 +44,14 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     # Backwards training?
     backwards = training_params['backwards']
 
-    random.seed(42) # For deterministic shuffling of dataset
-
     dataset_path = training_params['dataset_folder']
     rng = np.random.default_rng(42) # For deterministic shuffling of dataset
+
     # First copy the dataset in the current folder. This is useful in the case of a network drive, where the dataset is slow to access.
     # Can be removed if not used on Runai.
-    destination_path = os.path.join(cur_path,'local_dataset.h5')
+    dataset_name = os.path.basename(dataset_path)
+    destination_path = os.path.join(cur_path,dataset_name)
+
     if(not os.path.exists(destination_path)):
         print('Copying dataset to current folder...')
         # Use shutil.copy() to copy the file
@@ -63,15 +64,19 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     assert model_params['vocab_size']==0, 'Set vocab size to 0, determined by tokenizer.'
 
     model_params['vocab_size'] = tokenizer.vocab_size
+    print('#'*20)
+    print('Detected vocab size : ',model_params['vocab_size'])
+    print('#'*20)
 
+    print('Shuffling dataset...')
     indices = np.arange(len(motherDataset))
     rng.shuffle(indices)
     motherDataset = Subset(motherDataset, list(indices)) # Shuffled dataset
-
+    print('Finished shuffling.')
 
     # To keep it constant even if switching batch_size, I take batch_size=250
     val_inds = valid_steps*training_params['batch_size']
-    val_range = range(len(motherDataset)-val_inds,len(motherDataset)) # Validation, last portion of dataset
+    val_range = range(len(motherDataset)-val_inds,len(motherDataset)) # Validation, last portion of shuffled dataset
     keep_range = range(len(motherDataset)-val_inds) # Training, first portion of dataset
     
     #Whether backwards or forwards, its the individual examples that are flipped, not the dataset. So same thing for both !
@@ -82,23 +87,21 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     for i in range(1,3):
         idx = i
         print(f'{idx} TRAIN :',tokenizer.detokenize(train_dataset[idx][0]))
-        print(f'ANSWER : ',tokenizer.detokenize(train_dataset[idx][1]))
+        # print(f'ANSWER : ',tokenizer.detokenize(train_dataset[idx][1]))
         print(f'{idx} VALID :',tokenizer.detokenize(val_dataset[idx][0]))
-        print(f'ANSWER : ',tokenizer.detokenize(val_dataset[idx][1]))
+        # print(f'ANSWER : ',tokenizer.detokenize(val_dataset[idx][1]))
 
 
 
     model = MinGPT(**model_params)
 
     #====================== TRAINING PARAMETERS =======================
-    device = device
-
     batch_size = training_params['batch_size']
     aggregate = training_params['aggregate']
     totbatches = len(train_dataset)//batch_size
     
     if(training_params['steps_to_train']==None):
-        steps_to_train = totbatches # 4 epochs
+        steps_to_train = totbatches # 1 epoch
     else:
         steps_to_train = training_params['steps_to_train']
 
@@ -107,7 +110,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     warmup_steps = optim_params['warmup_steps']
     lr_init = optim_params['lr_init']
 
-    print(f'--- Training for ~ {steps_to_train//1000}k minibatches ---')
+    print(f'--- Training for ~ {steps_to_train//1000000}M minibatches ---')
     #------ Optimizers ------
     optim = torch.optim.AdamW(model.parameters(), lr=base_lr)
     scheduler = LinearLR(optim,start_factor=lr_init/base_lr,end_factor=1,total_iters=warmup_steps)
