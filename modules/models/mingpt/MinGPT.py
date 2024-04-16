@@ -6,10 +6,10 @@ from torch.nn import functional as F
 from torchenhanced import ConfigModule,DevModule
 
 
-class CausalSelfAttention(DevModule):
+class SlowCausalSelfAttention(DevModule):
     """
-        Multi-head masked self-attention layer. Maybe in the future, benchmark against
-        native pytorch implementation to make sure its not too slow/memory hungry
+        Multi-head masked self-attention layer. Old implementation, replaced with
+        the faster native torch 'multiheadattention' module.
 
         Args :
             embed_dim : number of embedding dimensions
@@ -33,6 +33,8 @@ class CausalSelfAttention(DevModule):
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer("bias", torch.tril(torch.ones(attn_length, attn_length))
                                      .view(1, 1, attn_length, attn_length))
+
+
         self.n_heads = n_heads
         self.embed_dim = embed_dim
 
@@ -40,7 +42,8 @@ class CausalSelfAttention(DevModule):
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-        q, k ,v  = self.c_attn(x).split(self.embed_dim, dim=2)
+        q, k ,v  = self.c_attn(x).split(self.embed_dim, dim=2) # (B, T, 3 * n_embd) -> 3 * (B, T, n_embd)
+
         k = k.reshape(B, T, self.n_heads, C // self.n_heads).transpose(1, 2) # (B, nh, T, hs)
         q = q.reshape(B, T, self.n_heads, C // self.n_heads).transpose(1, 2) # (B, nh, T, hs)
         v = v.reshape(B, T, self.n_heads, C // self.n_heads).transpose(1, 2) # (B, nh, T, hs)
@@ -58,6 +61,120 @@ class CausalSelfAttention(DevModule):
         x = self.resid_dropout(self.c_proj(x))
 
         return x
+    
+
+class CausalSelfAttention(DevModule):
+    """
+        Multi-head masked self-attention layer. Update to use the native torch 'multiheadattention' module.
+
+
+        Args :
+            embed_dim : number of embedding dimensions
+            n_heads : number of attention heads
+            attn_length : length of the attention window
+            dropout : (optional) dropout probability 
+    """
+
+    def __init__(self, embed_dim : int, n_heads :int, attn_length:int, dropout:float = 0.1):
+        super().__init__()
+        assert embed_dim % n_heads == 0, 'Number of heads {n_head} must divide embedding dim {n_embd}'
+
+        # key, query, value projections for all heads are contained inside pytorch MultiheadAttention module
+
+        self.flash_attention = nn.MultiheadAttention(embed_dim, n_heads, dropout=dropout, batch_first=True)
+
+        # dropout for the residual addition
+        # Would fit better inside 'BLOCK', but I did that way historically, oh well.
+        self.resid_dropout = nn.Dropout(dropout)
+
+        # causal mask to ensure that attention is only applied to the left in the input sequence
+        self.register_buffer("mask", nn.Transformer.generate_square_subsequent_mask(attn_length, device=self.device))
+
+        self.n_heads = n_heads
+        self.embed_dim = embed_dim
+
+    
+    def forward(self, x):
+        B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
+
+        x, _ = self.flash_attention(x,x,x,is_causal=True, attn_mask=self.mask[:T,:T]) # (B, T, n_embd)
+
+        return self.resid_dropout(x)
+
+def compare_forwards():
+    """
+        Just a sanity check the thing is implemented correctly.
+        Will reset all weights potentially, so only use for debugging.
+
+        Args :
+            x : (B,T,C) tensor of data to forward through the model
+            
+    """
+    attn_length = 20
+    embed_dim = 16
+    n_heads = 4
+    B = 2
+    T = 15
+    x = torch.randn(B,T,embed_dim)
+
+    attn1 = SlowCausalSelfAttention(embed_dim=embed_dim,n_heads=n_heads,attn_length=attn_length, dropout=0.0)
+    attn2 = CausalSelfAttention(embed_dim=embed_dim,n_heads=n_heads,attn_length=attn_length, dropout=0.0)
+
+    # Copy weights
+    attn2.flash_attention.in_proj_weight = torch.nn.Parameter(attn1.c_attn.weight)
+    attn2.flash_attention.in_proj_bias = torch.nn.Parameter(attn1.c_attn.bias)
+    attn2.flash_attention.out_proj.weight = torch.nn.Parameter(attn1.c_proj.weight)
+    attn2.flash_attention.out_proj.bias = torch.nn.Parameter(attn1.c_proj.bias)
+
+    x1 = attn1(x)
+    x2 = attn2(x)
+
+    torch.allclose(x1,x2), 'My attention and theirs dont match'
+
+    print('Passed !')
+
+@torch.no_grad()
+def compare_speed(embed_dim=32,n_heads=4,attn_length=20,batch_size=32,num_batches=1000,device='cpu'):
+    """
+        Compare the speed of the old and new attention implementations.
+
+        Args :
+            embed_dim : number of embedding dimensions
+            n_heads : number of attention heads
+            attn_length : length of the attention window
+    """
+    import time
+
+    attn1 = SlowCausalSelfAttention(embed_dim=embed_dim,n_heads=n_heads,attn_length=attn_length, dropout=0.0)
+    attn2 = CausalSelfAttention(embed_dim=embed_dim,n_heads=n_heads,attn_length=attn_length, dropout=0.0)
+
+    # Copy weights
+    attn2.flash_attention.in_proj_weight = torch.nn.Parameter(attn1.c_attn.weight)
+    attn2.flash_attention.in_proj_bias = torch.nn.Parameter(attn1.c_attn.bias)
+    attn2.flash_attention.out_proj.weight = torch.nn.Parameter(attn1.c_proj.weight)
+    attn2.flash_attention.out_proj.bias = torch.nn.Parameter(attn1.c_proj.bias)
+
+    attn1.to(device)
+    attn2.to(device)
+    # Test slow
+    torch.cuda.synchronize()
+    t1 = time.time()
+    for i in range(num_batches):
+        x = torch.randn(batch_size,attn_length,embed_dim,device=device)
+        x = attn1(x)
+    torch.cuda.synchronize()
+    t2 = time.time()
+    print(f'Slow attention : {num_batches} batches of size {batch_size} took {t2-t1:.2f} seconds')
+
+    # Test fast
+    torch.cuda.synchronize()
+    t1 = time.time()
+    for i in range(num_batches):
+        x = torch.randn(batch_size,attn_length,embed_dim,device=device)
+        x = attn2(x)
+    torch.cuda.synchronize()
+    t2 = time.time()
+    print(f'Fast attention : {num_batches} batches of size {batch_size} took {t2-t1:.2f} seconds')
 
 
 class Block(DevModule):

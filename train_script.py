@@ -1,7 +1,7 @@
 """
     Training script for GPT models, used for all experiments of section 3 of the paper 'Arrows of Time for Large Language Models'
 """
-from modules import MinGPT, MinGPT_Trainer, SimpleTokenizer, TokenTextBOS
+from modules import MinGPT, MinGPT_Trainer, SimpleTokenizer, SixerTokenizer,TokenTextBOS
 import torch, torch.optim,os, argparse,json, pathlib,random
 from torch.utils.data import Subset
 from torch.optim.lr_scheduler import LinearLR
@@ -16,9 +16,13 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
 
     if(tokenizer_name is not None):
         ## FOR NOW, THE TOKENIZER IS HARDCODED. IF WE NEED DIFFERENT ONES, WE SHALL SEE WHAT TO DO
-        tokenizer_path = os.path.join(cur_path,'tokenizers',f'{tokenizer_name}.pt')
-
-        tokenizer = SimpleTokenizer(tokenizer_path)
+        if(tokenizer_name=='sixtokenizer'):
+            tokenizer = SixerTokenizer()
+            print('Using SixTokenizer.')
+        else:
+            tokenizer_path = os.path.join(cur_path,'tokenizers',f'{tokenizer_name}.pt')
+            tokenizer = SimpleTokenizer(tokenizer_path)
+            
     else :
         raise ValueError('No tokenizer name given. Please specify a tokenizer name with the -t flag.')
 
@@ -33,7 +37,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
         print('USING FIXED TORCH SEED : ', training_params['seed'])
         seed = training_params['seed']
         torch.manual_seed(seed)
-        torch.use_deterministic_algorithms(True)
+        # torch.use_deterministic_algorithms(True)
 
 
     if not os.path.exists(training_params['dataset_folder']):
@@ -117,7 +121,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     base_lr = optim_params['lr']
     warmup_steps = optim_params['warmup_steps']
     lr_init = optim_params['lr_init']
-    lr_shrink_factor = optim_params['lr_shrink_factor']
+    lr_shrink_factor = optim_params['lr_shrink']
     lr_min = optim_params['lr_min']
     oscil_steps = optim_params['oscil_steps']
 

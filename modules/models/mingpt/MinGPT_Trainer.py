@@ -14,7 +14,7 @@ class MinGPT_Trainer(Trainer):
                  detokenizer :SimpleTokenizer=None, optim: Optimizer = None, scheduler: _LRScheduler = None, 
                  state_save_loc=None, device: str = 'cpu',parallel=None, run_name: str = None, project_name: str = None,
                  run_config: dict ={}):
-        super().__init__(model, optim, scheduler, state_save_loc=state_save_loc,parallel=parallel, device=device, run_name=run_name, project_name=project_name, run_config=run_config)
+        super().__init__(model, optim, scheduler, save_loc=state_save_loc,parallel=parallel, device=device, run_name=run_name, project_name=project_name, run_config=run_config)
 
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
@@ -36,9 +36,9 @@ class MinGPT_Trainer(Trainer):
 
     def process_batch(self, batch_data):
         # Check if correct, but should be :
-        loss = self.compute_loss(batch_data) #(B,T) loss
+        loss = self.compute_loss(batch_data) # (B,T) loss
 
-        if(self.do_batch_log) :
+        if(self.do_step_log) :
             wandb.log({'lr' : self.scheduler.get_last_lr()[0]},commit=False)
 
         return loss.mean()
@@ -50,7 +50,6 @@ class MinGPT_Trainer(Trainer):
 
         token_in = self.model.forward(token_in).transpose(1,2) # (B, vsize, T)
 
-        # Check if correct, but should be :
         loss = F.cross_entropy(token_in,token_truth,reduction='none') # (B, T)
 
         return loss
@@ -62,7 +61,7 @@ class MinGPT_Trainer(Trainer):
 
         return loss.mean() # Average loss, (B, T) -> (1,)
         
-
+    @torch.no_grad()
     def valid_log(self):
         # Completes a sentence and logs it in the table
         data, _ = self.valid_dataset[random.randint(0,len(self.valid_dataset)-1)] # (T,)*2
