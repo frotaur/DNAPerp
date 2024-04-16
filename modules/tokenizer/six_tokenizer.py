@@ -50,7 +50,8 @@ class SixerTokenizer(SimpleTokenizer):
         if(assert_ok) :
             for sentence in sentences:
                 assert len(sentence) % 6 == 0, f'Length of sentence (except \\n) {sentence} is not a multiple of 6'
-                assert set(sentence).issubset(set('acgt')), "String contains characters other than a, c, g, t or \\n"
+                assert set(sentence).issubset(set('acgtn')), f"String contains characters other than a, c, g, t or \\n  \
+                    \n offending string: {sentence}"
 
         try:
             for sentence in sentences:

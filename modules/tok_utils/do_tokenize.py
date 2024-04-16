@@ -4,7 +4,7 @@ import os, shutil
 from ..tokenizer.simple_tokenizer import SimpleTokenizer
 
 def tokenize(text_loc, tokenizer : SimpleTokenizer, output_name='last_tokenization', 
-             char_level = False,max_lines= 1e6):
+             char_level = False,max_lines= 1e7):
     """
         Tokenizes text to .pt files, using the given tokenizer.
         Saves results in tokendata folder, with name 'output_name'.

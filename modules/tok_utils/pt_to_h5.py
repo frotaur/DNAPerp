@@ -1,10 +1,10 @@
 import h5py , os, torch
 from tqdm import tqdm
 from ..tokenizer import SimpleTokenizer
+import re
 
 
-
-def make_h5(pt_data_folder, tokenizer:SimpleTokenizer, data_name=None,destination_folder = None):
+def make_h5(pt_data_folder, tokenizer:SimpleTokenizer, data_name=None,destination_folder = None, dtype='int'):
     """
         Make h5 dataset from a folder of pt files.
 
@@ -29,10 +29,15 @@ def make_h5(pt_data_folder, tokenizer:SimpleTokenizer, data_name=None,destinatio
         # extract_file = os.listdir(pt_data_folder)[0]
         # tensor = torch.load(os.path.join(pt_data_folder,extract_file))
         with h5py.File(tarname, 'w') as f:
-            dset = f.create_dataset("tokens", shape=(0,),maxshape=(None,), chunks=(512,), dtype='uint8')  # note the maxshape parameter
+            dset = f.create_dataset("tokens", shape=(0,),maxshape=(None,), chunks=(512,), dtype=dtype)  # note the maxshape parameter
             print('Created empty dataset')    
-            current_index = 0
-            for file in os.listdir(pt_data_folder):
+            dset_index=0
+            file_list = os.listdir(pt_data_folder)
+            file_list = sorted(file_list, key=lambda x: int(re.search(r'\d+', x).group()))
+            print('Sorted file_list : \n', file_list)
+            for file in file_list:
+                current_index = 0
+                print('Treating file : ', file)
                 if os.path.splitext(file)[1]=='.pt':
                     pt_file = os.path.join(pt_data_folder,file)
                     tensor = torch.load(pt_file,map_location=torch.device('cpu')) # (length)
@@ -42,15 +47,16 @@ def make_h5(pt_data_folder, tokenizer:SimpleTokenizer, data_name=None,destinatio
                     print('snippet', tokenizer.detokenize(tensor[:30]))
                     loadbar = tqdm(total=tot_length)
                     while current_index < tot_length:
-                        phrase_length = min(1024*1024*1024, tot_length - current_index)
+                        phrase_length = min(256*1024*1024, tot_length - current_index)
                         # Resize the dataset to accommodate the new data
-                        dset.resize((current_index + phrase_length,))
+                        dset.resize((dset_index + phrase_length,))
                         
                         # Add the new data to the dataset
-                        dset[current_index:current_index+phrase_length] = tensor[current_index:current_index+phrase_length].numpy()
+                        dset[dset_index:dset_index+phrase_length] = tensor[current_index:current_index+phrase_length].numpy()
                         
                         # Update the current ind
                         current_index += phrase_length
+                        dset_index += phrase_length
                         loadbar.update(phrase_length)
                     loadbar.close()
     else :

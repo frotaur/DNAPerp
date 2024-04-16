@@ -6,7 +6,7 @@ import torch, torch.optim,os, argparse,json, pathlib,random
 from torch.utils.data import Subset
 from torch.optim.lr_scheduler import LinearLR
 import numpy as np, shutil
-
+from torchenhanced import CosineWarmup
 
 def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp', 
           group=None, load=True,device='cpu'):
@@ -27,6 +27,14 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
         model_params = configo['model_params']
         training_params = configo['training_params']
         optim_params = configo['optim_params']
+
+    if 'seed' in training_params:
+        # Set fixed initialization
+        print('USING FIXED TORCH SEED : ', training_params['seed'])
+        seed = training_params['seed']
+        torch.manual_seed(seed)
+        torch.use_deterministic_algorithms(True)
+
 
     if not os.path.exists(training_params['dataset_folder']):
         raise FileNotFoundError(f"Tried to find dataset folder at \
@@ -109,11 +117,17 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     base_lr = optim_params['lr']
     warmup_steps = optim_params['warmup_steps']
     lr_init = optim_params['lr_init']
+    lr_shrink_factor = optim_params['lr_shrink_factor']
+    lr_min = optim_params['lr_min']
+    oscil_steps = optim_params['oscil_steps']
 
     print(f'--- Training for ~ {steps_to_train//1000000}M minibatches ---')
     #------ Optimizers ------
     optim = torch.optim.AdamW(model.parameters(), lr=base_lr)
-    scheduler = LinearLR(optim,start_factor=lr_init/base_lr,end_factor=1,total_iters=warmup_steps)
+    if(optim_params.get('cosine',False)):
+        scheduler = CosineWarmup(optim,warmup_steps=warmup_steps,lr_shrink=lr_shrink_factor,lr_init=lr_init,T_0=oscil_steps,eta_min=lr_min)
+    else:
+        scheduler = LinearLR(optim,start_factor=lr_init/base_lr,end_factor=1,total_iters=warmup_steps)
 
 
     trainer = MinGPT_Trainer(model=model,optim=optim,scheduler=scheduler,
