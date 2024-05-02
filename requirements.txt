@@ -1,6 +1,6 @@
 h5py
 numpy
 torch
-torchenhanced==0.3.0b1
+torchenhanced==0.3.0b2
 tqdm
 wandb

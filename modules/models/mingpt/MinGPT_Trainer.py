@@ -13,7 +13,7 @@ class MinGPT_Trainer(Trainer):
     def __init__(self, model: MinGPT, train_dataset: TokenTextBOS, valid_dataset : TokenTextBOS,
                  detokenizer :SimpleTokenizer=None, optim: Optimizer = None, scheduler: _LRScheduler = None, 
                  state_save_loc=None, device: str = 'cpu',parallel=None, run_name: str = None, project_name: str = None,
-                 run_config: dict ={}):
+                 run_config: dict ={}, backwards=False):
         super().__init__(model, optim, scheduler, save_loc=state_save_loc,parallel=parallel, device=device, run_name=run_name, project_name=project_name, run_config=run_config)
 
         self.train_dataset = train_dataset
@@ -22,7 +22,7 @@ class MinGPT_Trainer(Trainer):
         self.batch_loss = []
 
         self.detokenizer= detokenizer
-
+        self.backwards = backwards
         # Print number of parameters
         print(f"Number of parameters : {sum(p.numel() for p in self.model.parameters())/1e6:.2f}M")
 
@@ -71,10 +71,10 @@ class MinGPT_Trainer(Trainer):
         else:
             modello = self.model
             
-        phrase_out = modello.generate(data[None,:],max_new_tokens=100, do_sample=True).cpu() # (1, 5+300)
+        phrase_out = modello.generate(data[None,:],max_new_tokens=100, do_sample=True).cpu()[0] # (10+100,)
 
         if(self.backwards):
-            phrase_out= self.detokenizer.detokenize(torch.flip(phrase_out,dims=[1])) 
+            phrase_out= self.detokenizer.detokenize(torch.flip(phrase_out,dims=[0])) 
         else :
             phrase_out=self.detokenizer.detokenize(phrase_out)
 

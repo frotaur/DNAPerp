@@ -19,7 +19,7 @@
         "step_log": 200,
         "valid_steps": 1000,
         "state_save_loc": "datavol/vassilis/DNA_perp/runs",
-        "seed" : 102
+        "seed": 315
     },
     "optim_params": {
         "lr": 0.0001,

@@ -113,7 +113,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     totbatches = len(train_dataset)//batch_size
     
     if(training_params['steps_to_train']==None):
-        steps_to_train = totbatches # 1 epoch
+        steps_to_train = totbatches*10 # 1 epoch
     else:
         steps_to_train = training_params['steps_to_train']
 
@@ -134,7 +134,7 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
         scheduler = LinearLR(optim,start_factor=lr_init/base_lr,end_factor=1,total_iters=warmup_steps)
 
 
-    trainer = MinGPT_Trainer(model=model,optim=optim,scheduler=scheduler,
+    trainer = MinGPT_Trainer(model=model,optim=optim,scheduler=scheduler, backwards=backwards,
                             train_dataset=train_dataset,valid_dataset=val_dataset, detokenizer=tokenizer,
                             run_name=run_name, project_name=project_name, state_save_loc=training_params['state_save_loc'],
                             device=device, run_config={'group':group,'model_params':model_params,'train':training_params,'opti':optim_params} )
@@ -142,6 +142,10 @@ def train(file_location,tokenizer_name,pickup,project_name = 'DNAPerp',
     
     if(os.path.exists(os.path.join(training_params['state_save_loc'],project_name,'state',run_name+'.state')) and (load)):
         trainer.load_state(os.path.join(training_params['state_save_loc'],project_name,'state',run_name+'.state'))
+        ## SURGERY, TEMPORARY. Overwrites the last saved lr_init :
+        trainer.scheduler.lr_init = optim_params['lr_init']
+        trainer.run_config = dict(model=trainer.model.__class__.__name__,
+                            **{'group':group,'model_params':model_params,'train':training_params,'opti':optim_params})
     trainer.stepnum =1
 
     print(f'Will validate every : {valid_every} steps')
